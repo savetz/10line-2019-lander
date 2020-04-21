@@ -1,0 +1,119 @@
+'LANDER by Kevin Savetz
+'March 22 2019
+
+GRAPHICS 23:'GR. 7, no txt window. 159x92 
+'normally y=95 for full GR.7 screen, we lose a little because text line at top
+
+DIM F0$(16),F1$(10)
+F0$="\00\00\00\00\3C\42\42\3C\42\7E\5A\81":'LEM graphic with blank spaces around
+	'to make erasing old LEM easy as it moves vertically
+'F1$ is workspace for the P1 thrust flame
+FUEL=150:'starting fuel
+
+A=PEEK(106)-20:'set aside RAM for players
+POKE 54279,A:'PMBASE
+P=A*256:'top of P/M memory
+POKE 559,46:'Double line resolution P/M characters
+VX=-5+RAND(11):'Initial X speed
+POKE 53277,2:'turn on players (not missiles)
+M=DPEEK(88):'top of screen RAM
+MOVE M,P+512,384:'zero Player data, copying 0s from the fresh blank screen
+POKE 704,88:'PCOLR0. I like purple.
+
+'custom display list
+D=DPEEK(741):'location of display list
+POKE D+4,66:'top line is Graphics 0 text line (mode 2)
+-MOVE D+102,D+99,3:'shorten the display list so screen's not too tall
+POKE 752,1:'hide cursor
+
+'draw terrain & stars/ground texture
+COLOR 1
+PLOT 0,90-RAND(60):'start drawing terrain on left edge
+LPP=1:'first segment can't be landing pad
+FOR I=10 TO 150 STEP 10
+	Z=M+40+RAND(3500):'pick a location for star/ground texture
+	POKE Z,PEEK(Z)!3:'draw it
+	IF (LPP OR (RAND(5) OR LP=2)):'draw craggy rock if we just drew a landing pad
+			'or if we've alreadt drawn 2. Otherwise, maybe draw a pad
+		II=RAND(40)+52:'rock height
+		COLOR 1:'color of rock
+		LPP=0:'remember that last thing drawn isn't a pad
+	ELSE
+		COLOR 2:'color of pads
+		LP=LP+1:'count number of landing pads
+		LPP=1:'remember last thing drawn is a pad
+	ENDIF
+	DRAWTO I,II:'draw the rock/pad
+NEXT I
+COLOR 1
+DRAWTO 159,60
+PAINT 159,92
+
+DT=.05:'Time increment. Lower numbers make the game slower
+X=50+RAND(125):'Initial X
+Y=520:'Initial Y
+G=RAND(15)+5:'Strength of gravity
+VY=1+RAND(10):'Initital Y speed
+
+DO:'main loop
+	POKE 53278,0:'Clear PM collisions
+	X=X+VX*DT:'change LEM's X
+	POKE P+Y+264,0:'clear side thrust
+	Y=Y+VY*DT:'change LEM's Y
+	VY=VY+G*DT:'new Y speed
+	POKE 53248,X:'HPOSP0 position LEM at new X 
+	MOVE ADR(F0$),P+Y,16:'draw LEM at new vertical position
+
+	'clean up from last move...
+	-MOVE M,P+Y+136,12:'copy 0s from top corner of screen to erase flame (if any)
+	SOUND:'stop thrust sound if any
+
+	'thrust. Player 1 is the bottom thrust flame
+	IF FUEL AND STRIG(0)=0:'if trigger and have fuel
+		VY=VY-2:'decrease vertical speed
+		MOVE ADR(F1$),P+Y+136,10:'place flame 8 lines below P0
+		SOUND 0,50+Y,8,8:'I KNOW, there's no sound in space
+		POKE 53249,X:'P1 X position
+		POKE 705,50+RAND(11):'flame color
+		FOR Z=3 TO 8
+			POKE ADR(F1$)+Z,RAND(16)*4:'rows of random flame, but only 4 bytes
+								 'in the middle so it isn't too wide 00111100
+		NEXT Z
+		FUEL=FUEL-1:'reduce fuel
+	ELSE:'if no trigger, check for left/right thrust. Player 2 is the side thrust flame
+		S=STICK(0)
+		Z=(S=7)-(S=11):'get joystick left-right status
+		IF Z AND FUEL AND NOT FIRE:'if joystick and have fuel and LEM isn't thrusting up
+			POKE P+Y+264,3:'put P2 flame at correct vertical position relative to LEM
+			POKE 53250,X-3+(4*Z):'side flame on left or right of LEM
+			POKE 706,50+RAND(11):'P2 color
+			VX=VX-Z:'change X speed
+			SOUND 0,50,8,8:'noise
+			FUEL=FUEL-1
+		ENDIF
+	ENDIF
+	
+	POKE 87,0:'get ready to print in text window
+	
+	'If LEM goes off screen or hits terrain or hits landing pad too fast
+	IF X<40 OR X>205 OR Y<510 OR PEEK(53252)&1 OR (PEEK(53252)&2 AND (VY>10 OR ABS(VX)>5))
+		FOR Z=1 TO 250:'explosion
+			SOUND 0,50+RAND(30),6,8:'in space no one can hear you scream
+			MOVE 59740+RAND(500),P+Y+4,12:'copy random data from ROM to P1
+			POKE 704,50+RAND(21):'P1 color
+		NEXT Z
+		RUN:'restart
+	ENDIF
+
+	'show speed, gravity, and fuel
+	POS. 14,0:?"\1B\1D";INT(VY);" \1B\1F";INT(VX);
+	?" \C7";G;" \C6";FUEL;"  "
+
+	IF(PEEK(53252)&2):'touched landing pad, make happy music & restart
+		SOUND 0,121,10,10:PAUSE 80
+		SOUND 1,81,10,10:PAUSE 80
+		SOUND 2,60,10,10:PAUSE 150
+		RUN		
+	ENDIF
+		
+LOOP
