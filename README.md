@@ -1,6 +1,8 @@
 # 10line-lander
 Lunder Lander game in Turbo BASIC XL for Atari 8-bit. Entry for 2019 10-line BASIC contest
 
+![Screenshot](lander.jpg)
+
 Use the joystick controller to land your LEM (lunar excursion module) on a moon. Land on one of the green landing pads. The trigger fires the main thrusters, pushing the ship upward against the moon’s gravity. Left/right stick movement fires the side thrusters for horizontal movement.
 
 A control panel shows your vertical speed (indicated by ↓), horizontal speed (→), strength of gravity on the moon (G), and amount of fuel (F). To land safely, you must touch down on a landing area with a vertical speed of 10 or less, and horizontal speed of 5 or less. Flying off the sides or the top of the screen is deadly. Running out of fuel is not recommended.
